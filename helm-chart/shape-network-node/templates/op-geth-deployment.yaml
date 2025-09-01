@@ -1,0 +1,187 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "shape-network-node.fullname" . }}-op-geth
+  labels:
+    {{- include "shape-network-node.labels" . | nindent 4 }}
+    component: op-geth
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate  # Force old pod termination before creating new one
+  selector:
+    matchLabels:
+      {{- include "shape-network-node.selectorLabels" . | nindent 6 }}
+      component: op-geth
+  template:
+    metadata:
+      labels:
+        {{- include "shape-network-node.selectorLabels" . | nindent 8 }}
+        component: op-geth
+      annotations:
+        # Trigger rollout when ConfigMaps change
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+    spec:
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- if .Values.security.runAsNonRoot }}
+        runAsNonRoot: {{ .Values.security.runAsNonRoot }}
+        runAsUser: {{ .Values.security.runAsUser }}
+        fsGroup: {{ .Values.security.fsGroup }}
+        {{- end }}
+      initContainers:
+      # Download genesis.json from Arweave (with corrected URL)
+      - name: download-genesis
+        image: curlimages/curl:8.5.0
+        command:
+        - /bin/sh
+        - -c
+        - |
+          echo "Downloading genesis.json from corrected Arweave URL..."
+          curl -L -o /tmp-config/genesis.json "$(cat /config/genesis-url)"
+          echo "Genesis file downloaded, size: $(wc -c < /tmp-config/genesis.json) bytes"
+          echo "Chain ID check: $(grep -o '"chainId": [0-9]*' /tmp-config/genesis.json || echo 'Chain ID not found')"
+          ls -la /tmp-config/
+        volumeMounts:
+        - name: tmp-config
+          mountPath: /tmp-config
+        - name: config
+          mountPath: /config
+        securityContext:
+          runAsUser: {{ .Values.security.runAsUser | default 1000 }}
+      # Initialize op-geth datadir if needed
+      - name: init-geth
+        image: "{{ .Values.images.opGeth.repository }}:{{ .Values.images.opGeth.tag }}"
+        command:
+        - /bin/sh
+        - -c
+        - |
+          # Check if datadir is already initialized
+          if [ ! -f /geth/geth/nodekey ]; then
+            echo "Initializing geth datadir with genesis..."
+            geth init --datadir /geth /tmp-config/genesis.json
+            echo "Geth initialization complete"
+          else
+            echo "Geth datadir already initialized, skipping init"
+          fi
+        volumeMounts:
+        - name: geth-data
+          mountPath: /geth
+        - name: tmp-config
+          mountPath: /tmp-config
+        securityContext:
+          runAsUser: {{ .Values.security.runAsUser | default 1000 }}
+      containers:
+      - name: op-geth
+        image: "{{ .Values.images.opGeth.repository }}:{{ .Values.images.opGeth.tag }}"
+        imagePullPolicy: {{ .Values.images.opGeth.pullPolicy }}
+        command:
+        - /bin/sh
+        - -c
+        - |
+          echo "=== JWT Secret Debug ==="
+          ls -la /shared/
+          echo "JWT file size: $(wc -c < /shared/jwt.txt 2>/dev/null || echo 'FILE NOT FOUND')"
+          echo "JWT file content length: $(cat /shared/jwt.txt 2>/dev/null | wc -c || echo 'CANNOT READ')"
+          echo "First 20 chars: $(head -c 20 /shared/jwt.txt 2>/dev/null || echo 'CANNOT READ')"
+          echo "========================"
+          
+          exec geth \
+            --datadir=/geth \
+            --http \
+            --http.addr=0.0.0.0 \
+            --http.port=8545 \
+            --http.api=web3,debug,eth,txpool,net,engine \
+            --http.vhosts=* \
+            --http.corsdomain=* \
+            --ws \
+            --ws.addr=0.0.0.0 \
+            --ws.port=8546 \
+            --ws.api=web3,debug,eth,txpool,net,engine \
+            --ws.origins=* \
+            --authrpc.addr=0.0.0.0 \
+            --authrpc.port=8551 \
+            --authrpc.vhosts=* \
+            --authrpc.jwtsecret=/shared/jwt.txt \
+            --syncmode=full \
+            --gcmode=full \
+            --maxpeers=100 \
+            --cache=1024 \
+            --networkid=360 \
+            --rollup.disabletxpoolgossip=true \
+            --rollup.sequencerhttp=https://mainnet-sequencer.shape.network \
+            --metrics \
+            --metrics.addr=0.0.0.0 \
+            --metrics.port=6060
+        ports:
+        - name: http-rpc
+          containerPort: 8545
+          protocol: TCP
+        - name: ws-rpc
+          containerPort: 8546
+          protocol: TCP
+        - name: authrpc
+          containerPort: 8551
+          protocol: TCP
+        - name: p2p-tcp
+          containerPort: {{ .Values.service.ports.p2pGeth }}
+          protocol: TCP
+        - name: p2p-udp
+          containerPort: {{ .Values.service.ports.p2pGeth }}
+          protocol: UDP
+        - name: metrics
+          containerPort: 6060
+          protocol: TCP
+        volumeMounts:
+        - name: geth-data
+          mountPath: /geth
+        - name: shared
+          mountPath: /shared
+        resources:
+          {{- toYaml .Values.resources.opGeth | nindent 10 }}
+        livenessProbe:
+          httpGet:
+            path: /
+            port: http-rpc
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 5
+        readinessProbe:
+          httpGet:
+            path: /
+            port: http-rpc
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        securityContext:
+          runAsUser: {{ .Values.security.runAsUser | default 1000 }}
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false
+      volumes:
+      - name: geth-data
+        persistentVolumeClaim:
+          claimName: {{ include "shape-network-node.fullname" . }}-op-geth
+      - name: config
+        configMap:
+          name: {{ include "shape-network-node.fullname" . }}-config
+      - name: tmp-config
+        emptyDir: {}
+      - name: shared
+        secret:
+          secretName: {{ include "shape-network-node.fullname" . }}-secret
+          items:
+          - key: jwt-secret
+            path: jwt.txt

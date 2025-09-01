@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "shape-network-node.fullname" . }}-config
+  labels:
+    {{- include "shape-network-node.labels" . | nindent 4 }}
+data:
+  # Rollup configuration (small file, can be embedded)
+  rollup.json: |
+{{ .Files.Get "rollup.json" | indent 4 }}
+  
+  # Genesis and rollup configuration URLs for init container to download
+  genesis-url: "{{ .Values.config.genesisUrl }}"
+  rollup-url: "{{ .Values.config.rollupUrl }}"

@@ -1,0 +1,166 @@
+# Default values for shape-network-node.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+# Override naming to avoid duplication
+nameOverride: "shape-node"
+fullnameOverride: "shape-node"
+
+# SSL/HTTPS Configuration
+ssl:
+  enabled: true
+  # Domain for SSL certificate - will be updated by deployment script from Terraform output
+  domain: "shape-snow.eastus2.cloudapp.azure.com"
+  # Email for Let's Encrypt registration
+  email: {{ required "USER_EMAIL environment variable must be set" (getenv "USER_EMAIL") }}
+  # ClusterIssuer to use (letsencrypt-prod or letsencrypt-staging)
+  issuer: "letsencrypt-prod"
+  # Enable SSL redirect (false allows both HTTP and HTTPS)
+  forceSSL: false
+
+# Configuration URLs (for files too large to embed in chart)
+config:
+  # Shape Network genesis configuration from Arweave (CORRECTED URL)
+  genesisUrl: "https://f22kxmccnrjnjfrubtskjkveybhvcg3sle7vjjuu4qgzko54g4mq.arweave.net/LrSrsEJsUtSWNAzkpKqkwE9RG3JZP1SmlOQNlTu8Nxk"
+  # Shape Network rollup configuration from Arweave (CORRECTED URL)
+  rollupUrl: "https://fypw7dg3a4uhhcwmnqlmew6vz5vwzroc76dzlhhym22ltu5xlzwq.arweave.net/Lh9vjNsHKHOKzGwWwlvVz2tsxcL_h5Wc-Ga0udO3Xm0"
+
+# Chain Configuration
+shapeNetwork:
+  chainId: 360
+  networkName: "shape-mainnet"
+  l1ChainId: 1
+  
+# Node configuration
+node:
+  type: "full"  # or "archive"
+  
+# Official Optimism Docker images
+images:
+  opGeth:
+    repository: "us-docker.pkg.dev/oplabs-tools-artifacts/images/op-geth"
+    tag: "v1.101503.1"
+    pullPolicy: IfNotPresent
+  opNode:
+    repository: "us-docker.pkg.dev/oplabs-tools-artifacts/images/op-node"
+    tag: "v1.12.2"
+    pullPolicy: IfNotPresent
+  healthcheck:
+    repository: "ethereumoptimism/replica-healthcheck"
+    tag: "latest"
+    pullPolicy: IfNotPresent
+
+# Resources - ULTRA-MINIMAL for Standard_D2s_v3 (1900m allocatable CPU)
+resources:
+  opGeth:
+    requests:
+      memory: "2Gi"      # Reduced from 2.5Gi
+      cpu: "300m"        # Reduced from 400m
+    limits:
+      memory: "4Gi"      # Reduced from 4Gi  
+      cpu: "600m"        # Reduced from 800m
+  opNode:
+    requests:
+      memory: "512Mi"    # Increased to prevent OOMKilled
+      cpu: "100m"        # Keep current
+    limits:
+      memory: "1Gi"      # Increased to prevent OOMKilled
+      cpu: "200m"        # Keep current
+  # Healthcheck resources removed since disabled
+  healthcheck:
+    requests:
+      memory: "64Mi"     # Minimal if ever re-enabled
+      cpu: "50m"
+    limits:
+      memory: "128Mi"
+      cpu: "100m"
+
+# Storage configuration for Azure - Increased for growth
+storage:
+  opGeth:
+    size: "100Gi"        # Increased from 50Gi for future growth
+    storageClass: "managed-csi"  # Azure managed disks
+    accessMode: "ReadWriteOnce"
+  opNode:
+    size: "50Gi"
+    storageClass: "managed-csi"
+    accessMode: "ReadWriteOnce"
+
+# Service configuration
+service:
+  type: ClusterIP  # Changed from LoadBalancer to avoid IP conflict with NGINX Ingress
+  ports:
+    httpRpc: 8545
+    wsRpc: 8546
+    authRpc: 8551
+    opNodeRpc: 9545
+    p2pGeth: 39393
+    p2pNode: 9003
+    healthcheck: 7300
+  # Azure static IP configuration - REMOVED as NGINX Ingress will handle external access
+  # azure:
+  #   resourceGroup: "rg-shape-network-28j8lleo"
+  #   staticIpName: "shape-snow-mainnet-static-ip"
+
+# L1 Configuration - Shape Network specific endpoints
+l1:
+  # Ethereum mainnet RPC endpoint (for L1 connectivity)
+  rpcEndpoint: "https://eth-mainnet.g.alchemy.com/v2/CnpuV_Lvuc3P3s47Eo2kZ"
+  # Use a public beacon endpoint instead of Alchemy's beacon (which has issues)
+  beaconEndpoint: "https://ethereum-beacon-api.publicnode.com"
+  # RPC provider type: alchemy for your Alchemy endpoints
+  rpcType: "alchemy"
+
+# Shape Network specific bootnodes
+bootnodes:
+  - "enode://ae31be7c6596f4bc3657f90b65a1569c7b0db10c976649f06fe5cfb26139064d78d22b41aede293aa7358fc336d086051ac7fce78f063dce89e1da19c7b88aee@34.228.226.23:0?discport=30301"
+  - "enode://0bea78f02c9bee58326b3a612dae63dc5a0193fb3dfc9be687c9757d25606405ef9f87810157598fce35688bdb5b3834dc6283afab6dc5774abbd6c5a7b17cea@3.85.27.162:0?discport=30301"
+
+# Override flags for Shape Network
+overrides:
+  granite: "1727370000"
+  holocene: "1740139200"
+
+# Monitoring and healthcheck configuration (COST OPTIMIZED - Minimal monitoring)
+monitoring:
+  # Basic healthcheck - disabled to save resources
+  healthcheck:
+    enabled: false
+    port: 7300
+    # Reference RPC provider for healthchecks - Shape Network mainnet endpoint
+    referenceRpcProvider: "https://shape-mainnet.g.alchemy.com/v2/Gtaavpi0Nh-TvKldG704i"
+  # Prometheus metrics collection - disabled to save resources  
+  prometheus:
+    enabled: false
+    port: 9090
+  # Grafana dashboards - disabled to save resources
+  grafana:
+    enabled: false
+    port: 3000
+
+# Security
+security:
+  # JWT secret - 64 hex characters for op-geth compatibility
+  jwtSecret: "e5750f4d399cf38ed3a257a54e2c1813b72ab3f5868e76d305996dd6f95d24aa"
+  # Run as non-root user
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+
+# Replica count
+replicaCount: 1
+
+# Node selector for Azure
+nodeSelector:
+  kubernetes.io/os: linux
+
+# Tolerations
+tolerations: []
+
+# Affinity
+affinity: {}
+
+# Pod disruption budget
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1

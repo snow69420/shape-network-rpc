@@ -1,0 +1,28 @@
+apiVersion: v2
+name: shape-network-node
+description: Production-ready Helm chart for Shape Network mainnet node (Optimism stack)
+version: 1.0.0
+appVersion: "1.0.0"
+keywords:
+  - blockchain
+  - optimism
+  - shape-network
+  - ethereum
+  - l2
+  - mainnet
+home: https://shape.network
+sources:
+  - https://github.com/ethereum-optimism/optimism
+  - https://github.com/smartcontracts/simple-optimism-node
+maintainers:
+  - name: Shape Network Team
+    url: https://shape.network
+annotations:
+  # Supported op-geth versions (Pectra-compatible)
+  "shape.network/op-geth-min-version": "v1.101503.1"
+  # Supported op-node versions (altDA-compatible)  
+  "shape.network/op-node-min-version": "v1.12.2"
+  # Target Azure node size
+  "azure/recommended-vm-size": "Standard_D2s_v3"
+  # Estimated monthly cost
+  "azure/estimated-cost-usd": "120-140"

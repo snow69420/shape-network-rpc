@@ -1,0 +1,54 @@
+{{- if and .Values.ingress.enabled false }}
+# Combined ingress for both HTTP JSON-RPC and WebSocket endpoints
+# DISABLED: Combined into main ingress to avoid host/path conflicts
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "shape-network-node.fullname" . }}-rpc-ingress
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    {{- if .Values.certManager.enabled }}
+    cert-manager.io/cluster-issuer: {{ .Values.certManager.clusterIssuer.name }}
+    {{- end }}
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/ssl-passthrough: "false"
+    # WebSocket support for all paths
+    nginx.ingress.kubernetes.io/websocket-services: "{{ include "shape-network-node.fullname" . }}-op-geth"
+    nginx.ingress.kubernetes.io/websocket-services-path: "/"
+    # CORS headers for both JSON-RPC and WebSocket access
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "*"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, OPTIONS"
+    nginx.ingress.kubernetes.io/cors-allow-headers: "DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization"
+    nginx.ingress.kubernetes.io/cors-expose-headers: "Content-Length,Content-Range"
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  {{- if .Values.ingress.tls.enabled }}
+  tls:
+  - hosts:
+    - {{ .Values.ingress.hostname }}
+    secretName: {{ .Values.ingress.tls.secretName }}
+  {{- end }}
+  rules:
+  - host: {{ .Values.ingress.hostname }}
+    http:
+      paths:
+      # Root path - handles both JSON-RPC (HTTP) and WebSocket
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: {{ include "shape-network-node.fullname" . }}-op-geth
+            port:
+              number: 8545  # HTTP JSON-RPC port
+      # WebSocket path (alternative access)
+      - path: /ws
+        pathType: Prefix
+        backend:
+          service:
+            name: {{ include "shape-network-node.fullname" . }}-op-geth
+            port:
+              number: 8546  # WebSocket port
+{{- end }}

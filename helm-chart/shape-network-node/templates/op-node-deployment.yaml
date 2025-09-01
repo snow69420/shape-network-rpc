@@ -1,0 +1,145 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "shape-network-node.fullname" . }}-op-node
+  labels:
+    {{- include "shape-network-node.labels" . | nindent 4 }}
+    component: op-node
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate  # Force old pod termination before creating new one
+  selector:
+    matchLabels:
+      {{- include "shape-network-node.selectorLabels" . | nindent 6 }}
+      component: op-node
+  template:
+    metadata:
+      labels:
+        {{- include "shape-network-node.selectorLabels" . | nindent 8 }}
+        component: op-node
+      annotations:
+        # Trigger rollout when ConfigMaps change
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+    spec:
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- if .Values.security.runAsNonRoot }}
+        runAsNonRoot: {{ .Values.security.runAsNonRoot }}
+        runAsUser: {{ .Values.security.runAsUser }}
+        fsGroup: {{ .Values.security.fsGroup }}
+        {{- end }}
+      containers:
+      - name: op-node
+        image: "{{ .Values.images.opNode.repository }}:{{ .Values.images.opNode.tag }}"
+        imagePullPolicy: {{ .Values.images.opNode.pullPolicy }}
+        command:
+        - /bin/sh
+        - -c
+        - |
+          echo "Waiting for op-geth to be ready..."
+          sleep 30
+          echo "Starting op-node..."
+          exec op-node \
+            --l2=http://{{ include "shape-network-node.fullname" . }}-op-geth:8551 \
+            --l2.jwt-secret=/shared/jwt.txt \
+            --sequencer.enabled=false \
+            --rollup.config=/chainconfig/rollup.json \
+            --rpc.addr=0.0.0.0 \
+            --rpc.port=9545 \
+            --p2p.listen.ip=0.0.0.0 \
+            --p2p.listen.tcp={{ .Values.service.ports.p2pNode }} \
+            --p2p.listen.udp={{ .Values.service.ports.p2pNode }} \
+            --p2p.priv.path=/node-data/opnode_p2p_priv.txt \
+            --p2p.peerstore.path=/node-data/opnode_peerstore_db \
+            --p2p.discovery.path=/node-data/opnode_discovery_db \
+            {{- if .Values.bootnodes }}
+            --p2p.bootnodes={{ include "shape-network-node.bootnodes" . }} \
+            {{- end }}
+            --override.granite=1727370000 \
+            --override.holocene=1740139200 \
+            {{- if .Values.l1.rpcEndpoint }}
+            --l1={{ .Values.l1.rpcEndpoint }} \
+            {{- end }}
+            {{- if .Values.l1.beaconEndpoint }}
+            --l1.beacon={{ .Values.l1.beaconEndpoint }} \
+            {{- end }}
+            --l1.rpckind={{ .Values.l1.rpcType }} \
+            --log.level=info \
+            --metrics.enabled \
+            --metrics.addr=0.0.0.0 \
+            --metrics.port=7300
+        env:
+        # Environment variables matching simple-optimism-node format
+        - name: NETWORK_NAME
+          value: "{{ .Values.shapeNetwork.networkName }}"
+        - name: NODE_TYPE
+          value: "{{ .Values.node.type }}"
+        - name: EXECUTION_CLIENT
+          value: "op-geth"
+        ports:
+        - name: rpc
+          containerPort: 9545
+          protocol: TCP
+        - name: p2p-tcp
+          containerPort: {{ .Values.service.ports.p2pNode }}
+          protocol: TCP
+        - name: p2p-udp
+          containerPort: {{ .Values.service.ports.p2pNode }}
+          protocol: UDP
+        - name: metrics
+          containerPort: 7300
+          protocol: TCP
+        volumeMounts:
+        - name: node-data
+          mountPath: /node-data
+        - name: config
+          mountPath: /chainconfig
+        - name: shared
+          mountPath: /shared
+        resources:
+          {{- toYaml .Values.resources.opNode | nindent 10 }}
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: rpc
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 5
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: rpc
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        securityContext:
+          runAsUser: {{ .Values.security.runAsUser | default 1000 }}
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false
+      volumes:
+      - name: node-data
+        persistentVolumeClaim:
+          claimName: {{ include "shape-network-node.fullname" . }}-op-node
+      - name: config
+        configMap:
+          name: {{ include "shape-network-node.fullname" . }}-config
+      - name: shared
+        secret:
+          secretName: {{ include "shape-network-node.fullname" . }}-secret
+          items:
+          - key: jwt-secret
+            path: jwt.txt

@@ -1,0 +1,70 @@
+{{- if .Values.monitoring.healthcheck.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "shape-network-node.fullname" . }}-healthcheck
+  labels:
+    {{- include "shape-network-node.labels" . | nindent 4 }}
+    component: healthcheck
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "shape-network-node.selectorLabels" . | nindent 6 }}
+      component: healthcheck
+  template:
+    metadata:
+      labels:
+        {{- include "shape-network-node.selectorLabels" . | nindent 8 }}
+        component: healthcheck
+    spec:
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- if .Values.security.runAsNonRoot }}
+        runAsNonRoot: {{ .Values.security.runAsNonRoot }}
+        runAsUser: {{ .Values.security.runAsUser }}
+        fsGroup: {{ .Values.security.fsGroup }}
+        {{- end }}
+      containers:
+      - name: healthcheck
+        image: "{{ .Values.images.healthcheck.repository }}:{{ .Values.images.healthcheck.tag }}"
+        imagePullPolicy: {{ .Values.images.healthcheck.pullPolicy }}
+        env:
+        - name: HEALTHCHECK__REFERENCE_RPC_PROVIDER
+          value: {{ .Values.monitoring.healthcheck.referenceRpcProvider | quote }}
+        - name: HEALTHCHECK__TARGET_RPC_PROVIDER
+          value: "http://{{ include "shape-network-node.fullname" . }}-op-geth:8545"
+        ports:
+        - name: metrics
+          containerPort: 7300
+          protocol: TCP
+        resources:
+          {{- toYaml .Values.resources.healthcheck | nindent 10 }}
+        livenessProbe:
+          httpGet:
+            path: /metrics
+            port: metrics
+          initialDelaySeconds: 30
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /metrics
+            port: metrics
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        securityContext:
+          runAsUser: {{ .Values.security.runAsUser | default 1000 }}
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+{{- end }}

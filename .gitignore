@@ -1,0 +1,50 @@
+# Sensitive files and secrets
+values-custom.yaml
+*.key
+*.pem
+.env
+.shape-config
+
+# Terraform state files
+terraform/.terraform/
+terraform/*.tfstate.backup
+terraform/tfplan
+
+# Helm generated files
+helm-chart/shape-network-node/charts/
+helm-chart/shape-network-node/Chart.lock
+helm-chart/shape-network-node/values.yaml.backup.*
+
+# Log files and temporary outputs
+logs/
+scripts/logs/
+*.tmp
+*.log
+debug-*
+current-*
+
+# Backup files
+*.bak
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Node data (if running locally)
+geth-data/
+node-data/
+
+# Azure CLI cache
+.azure/
+
+# Development artifacts
+node_modules/
+dist/
+build/

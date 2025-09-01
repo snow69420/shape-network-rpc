@@ -1,0 +1,91 @@
+{{- if .Values.ingress.enabled }}
+# Homepage ingress - handles HTTP/HTTPS traffic on port 80/443
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "shape-network-node.fullname" . }}-homepage-ingress
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "false"
+    # WebSocket support for RPC paths
+    nginx.ingress.kubernetes.io/websocket-services: "{{ include "shape-network-node.fullname" . }}-op-geth"
+    nginx.ingress.kubernetes.io/websocket-services-path: "/ws"
+    # CORS headers for RPC access
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "*"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, OPTIONS"
+    nginx.ingress.kubernetes.io/cors-allow-headers: "DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization"
+    nginx.ingress.kubernetes.io/cors-expose-headers: "Content-Length,Content-Range"
+    # 🔒 ALLOWED SECURITY ENHANCEMENTS
+    # Rate limiting - 100 requests per minute per IP
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+    # Request size limits - prevent buffer overflow attacks
+    nginx.ingress.kubernetes.io/proxy-body-size: "1m"
+    nginx.ingress.kubernetes.io/proxy-buffer-size: "4k"
+    # Timeout configurations - prevent slowloris attacks
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "10"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "30"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "30"
+    # SSL/TLS configuration
+    {{- if .Values.ingress.tls.enabled }}
+    {{- if .Values.certManager.enabled }}
+    cert-manager.io/cluster-issuer: {{ .Values.certManager.clusterIssuer.name }}
+    # Ensure certificate is issued after homepage is ready
+    cert-manager.io/issue-temporary-certificate: "true"
+    {{- else }}
+    cert-manager.io/cluster-issuer: {{ .Values.ingress.tls.clusterIssuer }}
+    {{- end }}
+    nginx.ingress.kubernetes.io/ssl-passthrough: "false"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    {{- end }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  {{- if .Values.ingress.tls.enabled }}
+  tls:
+  - hosts:
+    - {{ .Values.ingress.hostname }}
+    secretName: {{ .Values.ingress.tls.secretName }}
+  {{- end }}
+  rules:
+  # DNS hostname access for homepage and RPC endpoints
+  - host: {{ .Values.ingress.hostname }}
+    http:
+      paths:
+      # Homepage
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: {{ include "shape-network-node.fullname" . }}-homepage
+            port:
+              number: 80
+      # ACME challenge path for SSL certificate validation
+      - path: /.well-known/acme-challenge/
+        pathType: Prefix
+        backend:
+          service:
+            name: {{ include "shape-network-node.fullname" . }}-homepage
+            port:
+              number: 80
+      # HTTP JSON-RPC endpoint
+      - path: /rpc
+        pathType: Prefix
+        backend:
+          service:
+            name: {{ include "shape-network-node.fullname" . }}-op-geth
+            port:
+              number: 8545
+      # WebSocket endpoint
+      - path: /ws
+        pathType: Prefix
+        backend:
+          service:
+            name: {{ include "shape-network-node.fullname" . }}-op-geth
+            port:
+              number: 8546
+{{- end }}

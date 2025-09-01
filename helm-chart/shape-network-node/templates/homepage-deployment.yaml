@@ -1,0 +1,98 @@
+{{- if .Values.homepage.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "shape-network-node.fullname" . }}-homepage
+  labels:
+    {{- include "shape-network-node.labels" . | nindent 4 }}
+    component: homepage
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      {{- include "shape-network-node.selectorLabels" . | nindent 6 }}
+      component: homepage
+  template:
+    metadata:
+      labels:
+        {{- include "shape-network-node.selectorLabels" . | nindent 8 }}
+        component: homepage
+      annotations:
+        # Trigger rollout when ConfigMaps change
+        checksum/config-homepage: {{ include (print $.Template.BasePath "/homepage-configmap.yaml") . | sha256sum }}
+    spec:
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- if .Values.security.runAsNonRoot }}
+        runAsNonRoot: {{ .Values.security.runAsNonRoot }}
+        runAsUser: {{ .Values.security.runAsUser }}
+        fsGroup: {{ .Values.security.fsGroup }}
+        {{- end }}
+      containers:
+      - name: nginx
+        image: "{{ .Values.homepage.image.repository }}:{{ .Values.homepage.image.tag }}"
+        imagePullPolicy: {{ .Values.homepage.image.pullPolicy }}
+        ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+        volumeMounts:
+        - name: homepage-content
+          mountPath: /usr/share/nginx/html
+        - name: nginx-config
+          mountPath: /etc/nginx/conf.d
+        - name: nginx-cache
+          mountPath: /var/cache/nginx
+        - name: nginx-tmp
+          mountPath: /tmp
+        - name: nginx-run
+          mountPath: /var/run
+        resources:
+          {{- toYaml .Values.homepage.resources | nindent 10 }}
+        livenessProbe:
+          httpGet:
+            path: /
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        securityContext:
+          runAsUser: {{ .Values.security.runAsUser | default 1000 }}
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+      volumes:
+      - name: homepage-content
+        configMap:
+          name: {{ include "shape-network-node.fullname" . }}-homepage-content
+      - name: nginx-config
+        configMap:
+          name: {{ include "shape-network-node.fullname" . }}-nginx-config
+      - name: nginx-cache
+        emptyDir: {}
+      - name: nginx-tmp
+        emptyDir: {}
+      - name: nginx-run
+        emptyDir: {}
+{{- end }}

@@ -1,0 +1,10 @@
+{{- if .Values.ingress.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tcp-services
+  namespace: ingress-nginx
+data:
+  8545: "shape-network/{{ include "shape-network-node.fullname" . }}-op-geth:8545"
+  8546: "shape-network/{{ include "shape-network-node.fullname" . }}-op-geth:8546"
+{{- end }}

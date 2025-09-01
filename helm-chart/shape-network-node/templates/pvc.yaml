@@ -1,0 +1,33 @@
+{{- if .Values.storage.opGeth.size }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "shape-network-node.fullname" . }}-op-geth
+  labels:
+    {{- include "shape-network-node.labels" . | nindent 4 }}
+    component: op-geth
+spec:
+  accessModes:
+    - {{ .Values.storage.opGeth.accessMode }}
+  storageClassName: {{ .Values.storage.opGeth.storageClass }}
+  resources:
+    requests:
+      storage: {{ .Values.storage.opGeth.size }}
+{{- end }}
+---
+{{- if .Values.storage.opNode.size }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "shape-network-node.fullname" . }}-op-node
+  labels:
+    {{- include "shape-network-node.labels" . | nindent 4 }}
+    component: op-node
+spec:
+  accessModes:
+    - {{ .Values.storage.opNode.accessMode }}
+  storageClassName: {{ .Values.storage.opNode.storageClass }}
+  resources:
+    requests:
+      storage: {{ .Values.storage.opNode.size }}
+{{- end }}

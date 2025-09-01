@@ -1,0 +1,104 @@
+{{- if .Values.certManager.enabled }}
+# Post-install hook to ensure homepage is ready before certificate issuance
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "shape-network-node.fullname" . }}-ssl-post-install
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "shape-network-node.labels" . | nindent 4 }}
+    app.kubernetes.io/component: ssl-post-install
+  annotations:
+    # This is a Helm hook that runs after install
+    "helm.sh/hook": post-install
+    "helm.sh/hook-weight": "1"
+    "helm.sh/hook-delete-policy": hook-succeeded
+spec:
+  template:
+    metadata:
+      name: {{ include "shape-network-node.fullname" . }}-ssl-post-install
+      labels:
+        {{- include "shape-network-node.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: ssl-post-install
+    spec:
+      restartPolicy: OnFailure
+      serviceAccountName: {{ include "shape-network-node.fullname" . }}-ssl-helper
+      containers:
+      - name: wait-for-homepage
+        image: bitnami/kubectl:latest
+        command:
+        - /bin/sh
+        - -c
+        - |
+          echo "Waiting for homepage pod to be ready..."
+          kubectl wait --for=condition=ready pod -l app.kubernetes.io/name={{ include "shape-network-node.name" . }},component=homepage --timeout=300s
+          echo "Homepage pod is ready!"
+
+          echo "Waiting for homepage service to be ready..."
+          kubectl wait --for=condition=available --timeout=30s deployment/{{ include "shape-network-node.fullname" . }}-homepage
+          echo "Homepage service is ready!"
+
+          echo "Checking SSL certificate status..."
+          kubectl wait --for=condition=ready --timeout=600s certificate/{{ include "shape-network-node.fullname" . }}-tls
+          echo "SSL certificate is ready!"
+---
+# Service account for the post-install hook
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "shape-network-node.fullname" . }}-ssl-helper
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "shape-network-node.labels" . | nindent 4 }}
+    app.kubernetes.io/component: ssl-helper
+  annotations:
+    "helm.sh/hook": post-install
+    "helm.sh/hook-weight": "0"
+    "helm.sh/hook-delete-policy": hook-succeeded
+---
+# Role for the service account to check pod and certificate status
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "shape-network-node.fullname" . }}-ssl-helper
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "shape-network-node.labels" . | nindent 4 }}
+    app.kubernetes.io/component: ssl-helper
+  annotations:
+    "helm.sh/hook": post-install
+    "helm.sh/hook-weight": "0"
+    "helm.sh/hook-delete-policy": hook-succeeded
+rules:
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"]
+  resources: ["deployments"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["cert-manager.io"]
+  resources: ["certificates"]
+  verbs: ["get", "list", "watch"]
+---
+# Role binding
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "shape-network-node.fullname" . }}-ssl-helper
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "shape-network-node.labels" . | nindent 4 }}
+    app.kubernetes.io/component: ssl-helper
+  annotations:
+    "helm.sh/hook": post-install
+    "helm.sh/hook-weight": "0"
+    "helm.sh/hook-delete-policy": hook-succeeded
+subjects:
+- kind: ServiceAccount
+  name: {{ include "shape-network-node.fullname" . }}-ssl-helper
+  namespace: {{ .Release.Namespace }}
+roleRef:
+  kind: Role
+  name: {{ include "shape-network-node.fullname" . }}-ssl-helper
+  apiGroup: rbac.authorization.k8s.io
+{{- end }}

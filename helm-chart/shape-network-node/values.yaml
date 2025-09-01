@@ -1,0 +1,210 @@
+# Default values for shape-network-node.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+# Override naming to avoid duplication
+nameOverride: "shape-node"
+fullnameOverride: "shape-node"
+
+# SSL/HTTPS Configuration
+ssl:
+  enabled: true
+  # Domain for SSL certificate - taken from environment variable
+  domain: {{ required "DNS_FQDN environment variable must be set" (getenv "DNS_FQDN") }}
+  # Email for Let's Encrypt registration - taken from environment variable
+  email: {{ required "USER_EMAIL environment variable must be set" (getenv "USER_EMAIL") }}
+  # ClusterIssuer to use (letsencrypt-prod or letsencrypt-staging)
+  issuer: "letsencrypt-prod"
+  # Enable SSL redirect (false allows both HTTP and HTTPS)
+  forceSSL: false
+
+# Global domain configuration - taken from environment variable
+global:
+  domain: {{ required "DNS_FQDN environment variable must be set" (getenv "DNS_FQDN") }}
+
+# Configuration URLs (for files too large to embed in chart)
+config:
+  # Shape Network genesis configuration from Arweave (CORRECTED URL)
+  genesisUrl: "https://f22kxmccnrjnjfrubtskjkveybhvcg3sle7vjjuu4qgzko54g4mq.arweave.net/LrSrsEJsUtSWNAzkpKqkwE9RG3JZP1SmlOQNlTu8Nxk"
+  # Shape Network rollup configuration from Arweave (CORRECTED URL)
+  rollupUrl: "https://fypw7dg3a4uhhcwmnqlmew6vz5vwzroc76dzlhhym22ltu5xlzwq.arweave.net/Lh9vjNsHKHOKzGwWwlvVz2tsxcL_h5Wc-Ga0udO3Xm0"
+
+# SSL/TLS Configuration with cert-manager
+certManager:
+  enabled: true
+  # ClusterIssuer configuration for Let's Encrypt
+  clusterIssuer:
+    name: "letsencrypt-prod"
+    email: {{ required "USER_EMAIL environment variable must be set" (getenv "USER_EMAIL") }}
+    server: "https://acme-v02.api.letsencrypt.org/directory"
+    # Enable automatic certificate renewal
+    renewBefore: "2160h"  # 90 days before expiry
+    # Private key algorithm and size
+    privateKey:
+      algorithm: "RSA"
+      size: 2048
+    # ACME solver configuration
+    solvers:
+      - http01:
+          ingress:
+            class: "nginx"
+            # Use homepage pod for ACME challenges
+            serviceType: "ClusterIP"
+
+# Chain Configuration
+shapeNetwork:
+  chainId: 360
+  networkName: "shape-mainnet"
+  l1ChainId: 1
+  
+# Node configuration
+node:
+  type: "full"  # or "archive"
+  
+# Official Optimism Docker images
+images:
+  opGeth:
+    repository: "us-docker.pkg.dev/oplabs-tools-artifacts/images/op-geth"
+    tag: "v1.101503.1"
+    pullPolicy: IfNotPresent
+  opNode:
+    repository: "us-docker.pkg.dev/oplabs-tools-artifacts/images/op-node"
+    tag: "v1.12.2"
+    pullPolicy: IfNotPresent
+  healthcheck:
+    repository: "ethereumoptimism/replica-healthcheck"
+    tag: "latest"
+    pullPolicy: IfNotPresent
+
+# Resources - OPTIMIZED for Standard_D2s_v3 single-node (1900m allocatable CPU, 7.2GB memory)
+# Conservative allocation to ensure all pods can be scheduled
+# Total requests: 400m + 200m = 600m CPU (32% of available capacity)
+# Total limits: 800m + 400m = 1200m CPU (63% of available capacity)
+resources:
+  opGeth:
+    requests:
+      memory: "2Gi"      # Reduced memory for main Ethereum client
+      cpu: "400m"        # Reduced CPU allocation to ensure scheduling
+    limits:
+      memory: "3Gi"      # Allow burst for heavy operations
+      cpu: "800m"        # Reduced burst limit
+  opNode:
+    requests:
+      memory: "1Gi"      # L2 sync operations memory
+      cpu: "200m"        # Reduced CPU for L2 operations
+    limits:
+      memory: "1.5Gi"    # Sufficient memory for blockchain sync
+      cpu: "400m"        # Reduced burst for L2 processing
+  # Healthcheck resources (kept minimal since disabled)
+  healthcheck:
+    requests:
+      memory: "64Mi"     # Minimal if ever re-enabled
+      cpu: "50m"
+    limits:
+      memory: "128Mi"
+      cpu: "100m"
+
+# Storage configuration for Azure - Keep existing storage class
+storage:
+  opGeth:
+    size: "100Gi"        # Kept at 100Gi for future growth
+    storageClass: "managed-csi"  # Reverted to match existing PVCs
+    accessMode: "ReadWriteOnce"
+  opNode:
+    size: "50Gi"         # Kept at 50Gi
+    storageClass: "managed-csi"  # Reverted to match existing PVCs
+    accessMode: "ReadWriteOnce"
+
+# Service configuration
+service:
+  type: ClusterIP  # Changed from LoadBalancer to avoid IP conflict with NGINX Ingress
+  ports:
+    httpRpc: 8545
+    wsRpc: 8546
+    authRpc: 8551
+    opNodeRpc: 9545
+    p2pGeth: 39393
+    p2pNode: 9003
+    healthcheck: 7300
+  # Azure static IP configuration - REMOVED as NGINX Ingress will handle external access
+  # azure:
+  #   resourceGroup: "rg-shape-network-28j8lleo"
+  #   staticIpName: "shape-snow-mainnet-static-ip"
+
+# L1 Configuration - High-performance public endpoints without rate limits
+l1:
+  # PublicNode public RPC - unlimited requests, supports all methods including eth_getProof
+  rpcEndpoint: "https://ethereum.publicnode.com"
+  # PublicNode beacon endpoint - no rate limits with token, enterprise grade
+  beaconEndpoint: "https://ethereum-beacon-api.publicnode.com"
+  # Any RPC type for public endpoints (more flexible than basic)
+  rpcType: "any"
+
+# Shape Network specific bootnodes
+bootnodes:
+  - "enode://ae31be7c6596f4bc3657f90b65a1569c7b0db10c976649f06fe5cfb26139064d78d22b41aede293aa7358fc336d086051ac7fce78f063dce89e1da19c7b88aee@34.228.226.23:0?discport=30301"
+  - "enode://0bea78f02c9bee58326b3a612dae63dc5a0193fb3dfc9be687c9757d25606405ef9f87810157598fce35688bdb5b3834dc6283afab6dc5774abbd6c5a7b17cea@3.85.27.162:0?discport=30301"
+
+# Override flags for Shape Network
+overrides:
+  granite: "1727370000"
+  holocene: "1740139200"
+
+# Monitoring and healthcheck configuration (COST OPTIMIZED - Minimal monitoring)
+monitoring:
+  # Basic healthcheck - disabled to save resources
+  healthcheck:
+    enabled: false
+    port: 7300
+    # Shape Network public RPC - free public endpoint for healthcheck comparison
+    referenceRpcProvider: "https://mainnet.shape.network"
+  # Prometheus metrics collection - disabled to save resources  
+  prometheus:
+    enabled: false
+    port: 9090
+  # Grafana dashboards - disabled to save resources
+  grafana:
+    enabled: false
+    port: 3000
+
+# Security
+security:
+  # JWT secret - 64 hex characters for op-geth compatibility
+  jwtSecret: "e5750f4d399cf38ed3a257a54e2c1813b72ab3f5868e76d305996dd6f95d24aa"
+  # Run as non-root user
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+
+# Replica count
+replicaCount: 1
+
+# Ingress configuration
+ingress:
+  enabled: true
+  className: "nginx"
+  hostname: {{ required "DNS_FQDN environment variable must be set" (getenv "DNS_FQDN") }}
+  tls:
+    enabled: true
+    secretName: "shape-node-tls"
+
+# Future nginx homepage pod configuration
+homepage:
+  enabled: true  # Enable the homepage pod
+  image:
+    repository: "nginx"
+    tag: "1.25-alpine"
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      memory: "32Mi"
+      cpu: "25m"
+    limits:
+      memory: "64Mi"
+      cpu: "50m"
+
+# Pod Disruption Budget configuration
+podDisruptionBudget:
+  enabled: false  # Disabled for single replica deployment
+  minAvailable: 1  # Minimum available pods (only relevant if enabled)
+

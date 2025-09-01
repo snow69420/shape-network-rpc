@@ -1,0 +1,254 @@
+{{- if .Values.homepage.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "shape-network-node.fullname" . }}-homepage-content
+  labels:
+    {{- include "shape-network-node.labels" . | nindent 4 }}
+    component: homepage
+data:
+  index.html: |
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Shape Network Terminal</title>
+        <style>
+            body {
+                font-family: 'Courier New', 'Monaco', 'Menlo', monospace;
+                background: #000;
+                color: #00ff00;
+                margin: 0;
+                padding: 20px;
+                min-height: 100vh;
+                line-height: 1.6;
+            }
+            .terminal {
+                background: #000;
+                border: 2px solid #00ff00;
+                border-radius: 8px;
+                padding: 20px;
+                max-width: 800px;
+                margin: 0 auto;
+                position: relative;
+            }
+            .terminal-header {
+                background: #333;
+                color: #00ff00;
+                padding: 8px 12px;
+                border-radius: 8px 8px 0 0;
+                font-size: 14px;
+                border-bottom: 1px solid #00ff00;
+                display: flex;
+                align-items: center;
+            }
+            .terminal-title {
+                flex: 1;
+                text-align: center;
+            }
+            .terminal-buttons {
+                display: flex;
+                gap: 8px;
+            }
+            .terminal-button {
+                width: 12px;
+                height: 12px;
+                border-radius: 50%;
+                display: inline-block;
+            }
+            .red { background: #ff5f57; }
+            .yellow { background: #ffbd2e; }
+            .green { background: #28ca42; }
+            .terminal-content {
+                padding: 25px;
+                font-size: 18px;
+            }
+            .command-line {
+                margin-bottom: 15px;
+            }
+            .prompt {
+                color: #00ff00;
+                font-weight: bold;
+            }
+            .output {
+                color: #00ff00;
+                margin-left: 20px;
+            }
+            .cursor {
+                animation: blink 1s infinite;
+            }
+            @keyframes blink {
+                0%, 50% { opacity: 1; }
+                51%, 100% { opacity: 0; }
+            }
+            .network-info {
+                margin-top: 20px;
+                border-top: 1px solid #00ff00;
+                padding-top: 15px;
+            }
+            .info-line {
+                margin-bottom: 8px;
+            }
+            .label {
+                color: #ffff00;
+                font-weight: bold;
+            }
+            .value {
+                color: #00ffff;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="terminal">
+            <div class="terminal-header">
+                <div class="terminal-buttons">
+                    <span class="terminal-button red"></span>
+                    <span class="terminal-button yellow"></span>
+                    <span class="terminal-button green"></span>
+                </div>
+                <div class="terminal-title">Shape Network Terminal</div>
+            </div>
+            <div class="terminal-content">
+                <div class="command-line">
+                    <span class="prompt">shape@network:~$</span> echo "GM Shapers of the world"<span class="cursor">_</span>
+                </div>
+                <div class="output">GM Shapers of the world</div>
+                
+                <div class="command-line">
+                    <span class="prompt">shape@network:~$</span> shape-network status
+                </div>
+                <div class="output">✓ Shape Network is running</div>
+                <div class="output">✓ Chain ID: 360 (0x168)</div>
+                <div class="output">✓ Network: Shape Mainnet</div>
+                
+                <div class="network-info">
+                    <div class="command-line">
+                        <span class="prompt">shape@network:~$</span> cat /etc/shape/endpoints.conf
+                    </div>
+                    <div class="output">
+                        <div class="info-line"><span class="label">HTTP JSON-RPC:</span> <span class="value">https://{{ .Values.ingress.hostname }}/rpc</span></div>
+                        <div class="info-line"><span class="label">WebSocket:</span> <span class="value">wss://{{ .Values.ingress.hostname }}/ws</span></div>
+                        <div class="info-line"><span class="label">Legacy HTTP:</span> <span class="value">http://{{ .Values.ingress.hostname }}/rpc</span></div>
+                        <div class="info-line"><span class="label">Legacy WS:</span> <span class="value">ws://{{ .Values.ingress.hostname }}/ws</span></div>
+                    </div>
+                </div>
+                
+                <div class="command-line">
+                    <span class="prompt">shape@network:~$</span> <span class="cursor">_</span>
+                </div>
+            </div>
+        </div>
+    </body>
+    </html>
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "shape-network-node.fullname" . }}-nginx-config
+  labels:
+    {{- include "shape-network-node.labels" . | nindent 4 }}
+    component: homepage
+data:
+  default.conf: |
+    server {
+        listen 8080;
+        listen [::]:8080;
+        server_name _;
+        
+        root /usr/share/nginx/html;
+        index index.html;
+        
+        # 🔒 ENHANCED SECURITY HEADERS
+        add_header X-Frame-Options "DENY" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header X-XSS-Protection "1; mode=block" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+        add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none';" always;
+        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
+        
+        # Hide server information
+        server_tokens off;
+        
+        # 🔒 REQUEST LIMITS - Prevent DoS attacks
+        client_max_body_size 1m;
+        client_body_buffer_size 4k;
+        client_header_buffer_size 1k;
+        large_client_header_buffers 4 4k;
+        
+        # Timeout configurations - prevent slowloris
+        client_body_timeout 10s;
+        client_header_timeout 10s;
+        keepalive_timeout 65s;
+        send_timeout 10s;
+        
+        # 🔒 BLOCK VPN/PROXY ACCESS (permissive mode)
+        # Only block very obvious VPN/proxy abuse patterns
+        if ($http_via ~* "vpn|tor|proxy.*abuse|anonymizer") {
+            return 403 "VPN/Proxy access denied\n";
+        }
+        # Allow private IPs through ingress controller
+        # Private network access is allowed for legitimate reverse proxy setups
+        
+        # 🔒 BLOCK INJECTION ATTACKS
+        # Block script injection
+        if ($request_uri ~* "(<|%3C).*script.*(>|%3E)") {
+            return 403 "Script injection blocked\n";
+        }
+        # Block iframe injection
+        if ($request_uri ~* "(<|%3C).*iframe.*(>|%3E)") {
+            return 403 "Iframe injection blocked\n";
+        }
+        # Block object/embed injection
+        if ($request_uri ~* "(<|%3C).*object.*(>|%3E)") {
+            return 403 "Object injection blocked\n";
+        }
+        if ($request_uri ~* "(<|%3C).*embed.*(>|%3E)") {
+            return 403 "Embed injection blocked\n";
+        }
+        # Block SQL injection patterns
+        if ($request_uri ~* "(union|select|insert|cast|declare|drop|update|md5|benchmark|script|javascript|vbscript|onload|onerror)") {
+            return 403 "Potential SQL/XSS attack blocked\n";
+        }
+        # Block path traversal
+        if ($request_uri ~* "\.\./") {
+            return 403 "Path traversal blocked\n";
+        }
+        # Block null byte injection
+        if ($request_uri ~* "%00") {
+            return 403 "Null byte injection blocked\n";
+        }
+        
+        # 🔒 RATE LIMITING - REMOVED (handled by ingress controller)
+        # limit_req_zone directives removed to prevent NGINX crash
+        # Rate limiting is handled at the ingress level
+        
+        # Gzip compression
+        gzip on;
+        gzip_vary on;
+        gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript;
+        
+        # ACME challenge directory for Let's Encrypt SSL certificate validation
+        location /.well-known/acme-challenge/ {
+            allow all;
+            root /usr/share/nginx/html;
+            try_files $uri =404;
+            # Disable access logging for ACME challenges
+            access_log off;
+            # Allow cross-origin requests for ACME challenges
+            add_header Access-Control-Allow-Origin *;
+        }
+        
+        location / {
+            try_files $uri $uri/ /index.html;
+            # Rate limiting handled by ingress controller
+        }
+        
+        # Health check endpoint
+        location /health {
+            access_log off;
+            return 200 "healthy\n";
+            add_header Content-Type text/plain;
+        }
+    }
+{{- end }}
