@@ -1,4 +1,4 @@
-# Shape Network RPC Node
+# Shape Network RPC Node v2.0 🚀
 
 A complete Shape Network L2 blockchain node deployment solution for Azure Kubernetes Service (AKS) with automated SSL certificates, ingress routing, and comprehensive monitoring.
 
@@ -201,6 +201,19 @@ After successful deployment, your Shape Network node will be available at:
 - **Homepage**: `https://your-domain.com`
 - **HTTP JSON-RPC**: `https://your-domain.com/rpc`
 - **WebSocket**: `wss://your-domain.com/ws`
+- **Legacy HTTP**: `http://your-domain.com/rpc` → Redirects to HTTPS
+- **Legacy WebSocket**: `ws://your-domain.com/ws` → Redirects to WSS
+
+### WebSocket Configuration Details
+
+**Important**: The WebSocket endpoint uses a **separate ingress configuration** with path rewriting:
+
+- **Main Ingress**: Handles HTTP traffic (`/rpc`, `/`)
+- **WebSocket Ingress**: Handles WebSocket traffic (`/ws`) with `nginx.ingress.kubernetes.io/rewrite-target: /`
+- **SSL Termination**: Both ingresses terminate SSL and proxy to backend services
+- **Path Mapping**: `/ws` requests are rewritten to `/` on the backend WebSocket server
+
+This configuration ensures proper WebSocket upgrade handling and path compatibility between client requests and server expectations.
 
 ### Example RPC Calls
 
@@ -223,6 +236,45 @@ curl -X POST -H "Content-Type: application/json" \
 curl -X POST -H "Content-Type: application/json" \
   --data '{"jsonrpc":"2.0","method":"net_peerCount","params":[],"id":1}' \
   https://your-domain.com/rpc
+```
+
+### WebSocket Testing
+
+**Test WebSocket handshake:**
+```bash
+curl -i -N --http1.1 \
+  -H "Connection: Upgrade" \
+  -H "Upgrade: websocket" \
+  -H "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==" \
+  -H "Sec-WebSocket-Version: 13" \
+  wss://your-domain.com/ws
+```
+
+**Expected successful response:**
+```
+HTTP/1.1 101 Switching Protocols
+Connection: upgrade
+Upgrade: websocket
+Sec-WebSocket-Accept: [hash]
+```
+
+**Test WebSocket with JSON-RPC (using Node.js):**
+```javascript
+const WebSocket = require('ws');
+const ws = new WebSocket('wss://your-domain.com/ws');
+
+ws.on('open', () => {
+  ws.send(JSON.stringify({
+    jsonrpc: '2.0',
+    method: 'eth_blockNumber',
+    params: [],
+    id: 1
+  }));
+});
+
+ws.on('message', (data) => {
+  console.log('Response:', data.toString());
+});
 ```
 
 ## ⚙️ Configuration
@@ -296,6 +348,12 @@ kubectl get ingress -n shape-network
 - Check cert-manager pod status
 - Review certificate validity
 
+**WebSocket connection problems:**
+- Ensure separate WebSocket ingress is configured
+- Check `nginx.ingress.kubernetes.io/rewrite-target: /` annotation
+- Verify WebSocket server is running on correct port (8546)
+- Test with: `curl -i -N --http1.1 -H "Connection: Upgrade" -H "Upgrade: websocket" -H "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==" -H "Sec-WebSocket-Version: 13" wss://your-domain.com/ws`
+
 **Resource constraints:**
 - Monitor pod resource usage
 - Adjust resource limits in values.yaml
@@ -348,7 +406,20 @@ kubectl get ingress -n shape-network
 
 ## � Recent Updates & Improvements
 
-### Version 1.1.0 - September 2025
+### Version 2.0.0 - September 2025 🚀 **FULLY FEATURED RELEASE**
+
+**Major WebSocket Implementation:**
+- ✅ **Complete WebSocket Support**: Full WebSocket connectivity with dedicated ingress
+- ✅ **Separate WebSocket Ingress**: Isolated WebSocket traffic handling
+- ✅ **Path Rewrite Configuration**: `nginx.ingress.kubernetes.io/rewrite-target: /` for proper routing
+- ✅ **SSL Termination**: Secure WebSocket connections with TLS
+- ✅ **Endpoint Compatibility**: Seamless `/ws` client to `/` server path mapping
+
+**Infrastructure Enhancements:**
+- ✅ **Pod Recreation**: Automated pod management and updates
+- ✅ **Endpoint Testing**: Comprehensive testing of all 5 endpoints
+- ✅ **Security Hardening**: SSL redirects for legacy endpoints
+- ✅ **Monitoring**: Full health check coverage
 
 **Health Check Script Simplification:**
 - ✅ **Simplified `healthcheck.sh`**: Reduced from ~800 lines to ~284 lines
@@ -363,10 +434,12 @@ kubectl get ingress -n shape-network
 - ✅ **File Consolidation**: Eliminated duplicate healthcheck files
 
 **Key Improvements:**
-- **Performance**: Faster health checks with focused testing
-- **Reliability**: Better error handling and resilience
-- **Maintainability**: Cleaner, more focused codebase
-- **User Experience**: Clearer output and better documentation
+- **WebSocket Support**: Complete WebSocket implementation with ingress configuration
+- **Full Endpoint Coverage**: All 5 endpoints (HTTP, WS, Legacy, Explorer) working
+- **Production Ready**: Comprehensive testing and documentation
+- **Security**: SSL/TLS for all connections with proper redirects
+- **Reliability**: Robust error handling and monitoring
+- **User Experience**: Clear documentation and testing examples
 
 ### Configuration Management
 
@@ -428,6 +501,7 @@ For issues and questions:
 ---
 
 **Last Updated**: September 1, 2025
-**Version**: 1.1.0
+**Version**: 2.0.0
 **Shape Network**: Mainnet
 **Health Check**: Simplified (284 lines)
+**WebSocket**: ✅ Fully Configured
