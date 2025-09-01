@@ -90,13 +90,6 @@ spec:
         - /bin/sh
         - -c
         - |
-          echo "=== JWT Secret Debug ==="
-          ls -la /shared/
-          echo "JWT file size: $(wc -c < /shared/jwt.txt 2>/dev/null || echo 'FILE NOT FOUND')"
-          echo "JWT file content length: $(cat /shared/jwt.txt 2>/dev/null | wc -c || echo 'CANNOT READ')"
-          echo "First 20 chars: $(head -c 20 /shared/jwt.txt 2>/dev/null || echo 'CANNOT READ')"
-          echo "========================"
-          
           exec geth \
             --datadir=/geth \
             --http \
@@ -121,6 +114,7 @@ spec:
             --networkid=360 \
             --rollup.disabletxpoolgossip=true \
             --rollup.sequencerhttp=https://mainnet-sequencer.shape.network \
+            --verbosity={{ .Values.logging.opGethLevel }} \
             --metrics \
             --metrics.addr=0.0.0.0 \
             --metrics.port=6060

@@ -150,6 +150,13 @@ overrides:
   granite: "1727370000"
   holocene: "1740139200"
 
+# Logging configuration - OPTIMIZED to reduce log volume
+logging:
+  # Op-node log level (options: error, warn, info, debug)
+  opNodeLevel: "warn"  # Reduced from "info" to reduce log volume
+  # Op-geth log level (options: 0=critical, 1=error, 2=warn, 3=info, 4=debug, 5=detail)
+  opGethLevel: 2  # Reduced to warnings only to minimize logs
+
 # Monitoring and healthcheck configuration (COST OPTIMIZED - Minimal monitoring)
 monitoring:
   # Basic healthcheck - disabled to save resources

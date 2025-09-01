@@ -76,7 +76,7 @@ spec:
             --l1.beacon={{ .Values.l1.beaconEndpoint }} \
             {{- end }}
             --l1.rpckind={{ .Values.l1.rpcType }} \
-            --log.level=info \
+            --log.level={{ .Values.logging.opNodeLevel }} \
             --metrics.enabled \
             --metrics.addr=0.0.0.0 \
             --metrics.port=7300
