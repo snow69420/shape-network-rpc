@@ -80,6 +80,52 @@ spec:
             name: {{ include "shape-network-node.fullname" . }}-op-geth
             port:
               number: 8545
+{{- end }}
+---
+{{- if .Values.ingress.enabled }}
+# WebSocket ingress - handles WebSocket traffic on /ws
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "shape-network-node.fullname" . }}-websocket-ingress
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/websocket-services: "{{ include "shape-network-node.fullname" . }}-op-geth"
+    nginx.ingress.kubernetes.io/websocket-services-path: "/ws"
+    # CORS headers for WebSocket access
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "*"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, OPTIONS"
+    nginx.ingress.kubernetes.io/cors-allow-headers: "DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization"
+    nginx.ingress.kubernetes.io/cors-expose-headers: "Content-Length,Content-Range"
+    # SSL/TLS configuration
+    {{- if .Values.ingress.tls.enabled }}
+    {{- if .Values.certManager.enabled }}
+    cert-manager.io/cluster-issuer: {{ .Values.certManager.clusterIssuer.name }}
+    # Ensure certificate is issued after homepage is ready
+    cert-manager.io/issue-temporary-certificate: "true"
+    {{- else }}
+    cert-manager.io/cluster-issuer: {{ .Values.ingress.tls.clusterIssuer }}
+    {{- end }}
+    nginx.ingress.kubernetes.io/ssl-passthrough: "false"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    {{- end }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  {{- if .Values.ingress.tls.enabled }}
+  tls:
+  - hosts:
+    - {{ .Values.ingress.hostname }}
+    secretName: {{ .Values.ingress.tls.secretName }}
+  {{- end }}
+  rules:
+  # DNS hostname access for WebSocket endpoint
+  - host: {{ .Values.ingress.hostname }}
+    http:
+      paths:
       # WebSocket endpoint
       - path: /ws
         pathType: Prefix
