@@ -23,12 +23,12 @@ This project deploys a full Shape Network node consisting of:
 shape-network-rpc/
 ├── 📄 README.md                 # This comprehensive guide
 ├── 📄 install.sh                # Interactive installation script
-├── 📄 healthcheck.sh            # Comprehensive health monitoring
+├── 📄 healthcheck.sh            # Simplified health monitoring (284 lines)
 ├── 📄 genesis.json              # Shape Network genesis configuration
 ├── 📄 rollup.json               # Rollup configuration
 ├── 📄 .shape-config             # Deployment configuration (generated)
-├── � docs/                     # Documentation and analysis files
-├── � helm-chart/               # Kubernetes Helm deployment charts
+├── 📄 .gitignore               # Git ignore rules (includes docs/)
+├── 📁 helm-chart/               # Kubernetes Helm deployment charts
 │   └── shape-network-node/
 │       ├── 📄 Chart.yaml        # Helm chart metadata
 │       ├── 📄 values.yaml       # Configuration values
@@ -41,6 +41,8 @@ shape-network-rpc/
 │           └── 📄 configmap.yaml
 └── 📁 .git/                     # Git version control
 ```
+
+**Note**: The `docs/` folder is now ignored by Git (added to `.gitignore`) and contains generated documentation files that are not tracked in version control.
 
 ## 🚀 Quick Start
 
@@ -91,25 +93,39 @@ The installer will guide you through:
 - ✅ Resource optimization for cost efficiency
 - ✅ Comprehensive error handling and rollback
 
-### `healthcheck.sh` - Health Monitoring Script
+### `healthcheck.sh` - Simplified Health Monitoring Script
 
-**Comprehensive health checking and monitoring:**
+**Streamlined health checking focused on core functionality:**
 
 ```bash
 # Basic health check
 ./healthcheck.sh
 
 # Advanced options
+./healthcheck.sh --domain your-domain.com --ip 192.168.1.100
 ./healthcheck.sh --help
 ```
 
-**Checks Performed:**
-- ✅ Kubernetes pod status and resource usage
-- ✅ SSL certificate validity and expiration
-- ✅ RPC endpoint connectivity and response times
-- ✅ WebSocket connectivity
-- ✅ Azure infrastructure status
-- ✅ Network peer connections and sync status
+**Core Checks Performed:**
+- ✅ **SSL Certificate Test** - Basic HTTPS connectivity verification
+- ✅ **RPC Endpoint Tests** - Domain RPC, Direct IP RPC, Auth RPC (if available)
+- ✅ **Blockchain Status** - Chain ID, sync status, current block, peer count
+- ✅ **Configuration Auto-Detection** - Reads from `.shape-config` file
+
+**Key Features:**
+- **Simplified Design**: Reduced from ~800 lines to ~284 lines
+- **Focused Testing**: Core RPC, SSL, and blockchain functionality
+- **Clean Output**: Color-coded results with clear test summaries
+- **Error Resilience**: Continues testing even if individual tests fail
+- **Auto-Configuration**: Detects domain/IP from config files or uses defaults
+
+**Command-Line Options:**
+```bash
+./healthcheck.sh                    # Basic check with auto-detection
+./healthcheck.sh --domain example.com    # Override domain
+./healthcheck.sh --ip 192.168.1.100      # Override IP address
+./healthcheck.sh --help                  # Show help information
+```
 
 ## 🔧 Use Cases and Deployment Scenarios
 
@@ -330,15 +346,64 @@ kubectl get ingress -n shape-network
 - Restricted API access
 - Secure configuration management
 
-## 📚 Documentation
+## � Recent Updates & Improvements
 
-Detailed documentation is available in the `docs/` directory:
+### Version 1.1.0 - September 2025
+
+**Health Check Script Simplification:**
+- ✅ **Simplified `healthcheck.sh`**: Reduced from ~800 lines to ~284 lines
+- ✅ **Focused Core Functionality**: RPC endpoints, SSL, blockchain status
+- ✅ **Improved Error Handling**: Continues testing on individual failures
+- ✅ **Clean Output**: Removed redundant text, better formatting
+- ✅ **Auto-Configuration**: Smart domain/IP detection from `.shape-config`
+
+**Repository Organization:**
+- ✅ **Git Ignore Updates**: Added `docs/` folder to `.gitignore`
+- ✅ **Documentation Cleanup**: Removed tracked docs files from repository
+- ✅ **File Consolidation**: Eliminated duplicate healthcheck files
+
+**Key Improvements:**
+- **Performance**: Faster health checks with focused testing
+- **Reliability**: Better error handling and resilience
+- **Maintainability**: Cleaner, more focused codebase
+- **User Experience**: Clearer output and better documentation
+
+### Configuration Management
+
+**`.shape-config` File:**
+The installer generates a configuration file that stores:
+```bash
+# Example .shape-config content
+DNS_FQDN="your-domain.com"
+STATIC_IP="192.168.1.100"
+RESOURCE_GROUP="shape-network-rg"
+AKS_CLUSTER="shape-network-cluster"
+USER_EMAIL="admin@yourdomain.com"
+```
+
+**Auto-Detection Features:**
+- Healthcheck script automatically reads from `.shape-config`
+- Fallback to default values if config file missing
+- Command-line overrides available for custom testing
+
+## �📚 Documentation
+
+**Note**: The `docs/` folder is now ignored by Git (added to `.gitignore`) and contains generated documentation files that are not tracked in version control. These files include:
 
 - **SSL Implementation**: SSL certificate management and troubleshooting
 - **RPC Analysis**: L1 RPC provider configuration and optimization
 - **Port Configuration**: Network port mapping and firewall rules
 - **Resource Usage**: Performance monitoring and optimization
 - **Troubleshooting**: Common issues and resolution steps
+
+**To view documentation locally:**
+```bash
+# List available documentation files
+ls -la docs/
+
+# View specific documentation
+cat docs/README.md
+```
 
 ## 🤝 Contributing
 
@@ -363,5 +428,6 @@ For issues and questions:
 ---
 
 **Last Updated**: September 1, 2025
-**Version**: 1.0.0
+**Version**: 1.1.0
 **Shape Network**: Mainnet
+**Health Check**: Simplified (284 lines)

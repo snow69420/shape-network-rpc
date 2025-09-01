@@ -5,6 +5,9 @@ values-custom.yaml
 .env
 .shape-config
 
+# Documentation (generated or temporary)
+docs/
+
 # Terraform state files
 terraform/.terraform/
 terraform/*.tfstate.backup
