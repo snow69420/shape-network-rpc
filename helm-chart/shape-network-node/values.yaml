@@ -9,18 +9,18 @@ fullnameOverride: "shape-node"
 # SSL/HTTPS Configuration
 ssl:
   enabled: true
-  # Domain for SSL certificate - taken from environment variable
-  domain: {{ required "DNS_FQDN environment variable must be set" (getenv "DNS_FQDN") }}
-  # Email for Let's Encrypt registration - taken from environment variable
-  email: {{ required "USER_EMAIL environment variable must be set" (getenv "USER_EMAIL") }}
+  # Domain for SSL certificate - set via --set flag
+  domain: ""
+  # Email for Let's Encrypt registration - set via --set flag
+  email: ""
   # ClusterIssuer to use (letsencrypt-prod or letsencrypt-staging)
   issuer: "letsencrypt-prod"
   # Enable SSL redirect (false allows both HTTP and HTTPS)
   forceSSL: false
 
-# Global domain configuration - taken from environment variable
+# Global domain configuration - set via --set flag
 global:
-  domain: {{ required "DNS_FQDN environment variable must be set" (getenv "DNS_FQDN") }}
+  domain: ""
 
 # Configuration URLs (for files too large to embed in chart)
 config:
@@ -35,7 +35,7 @@ certManager:
   # ClusterIssuer configuration for Let's Encrypt
   clusterIssuer:
     name: "letsencrypt-prod"
-    email: {{ required "USER_EMAIL environment variable must be set" (getenv "USER_EMAIL") }}
+    email: ""
     server: "https://acme-v02.api.letsencrypt.org/directory"
     # Enable automatic certificate renewal
     renewBefore: "2160h"  # 90 days before expiry
@@ -183,7 +183,7 @@ replicaCount: 1
 ingress:
   enabled: true
   className: "nginx"
-  hostname: {{ required "DNS_FQDN environment variable must be set" (getenv "DNS_FQDN") }}
+  hostname: ""
   tls:
     enabled: true
     secretName: "shape-node-tls"

@@ -16,32 +16,34 @@ data:
         <title>Shape Network Terminal</title>
         <style>
             body {
-                font-family: 'Courier New', 'Monaco', 'Menlo', monospace;
-                background: #000;
-                color: #00ff00;
+                font-family: Consolas, 'Courier New', 'Monaco', 'Menlo', monospace;
+                background: #1e1e1e;
+                color: #cccccc;
                 margin: 0;
                 padding: 20px;
                 min-height: 100vh;
                 line-height: 1.6;
             }
             .terminal {
-                background: #000;
-                border: 2px solid #00ff00;
-                border-radius: 8px;
-                padding: 20px;
-                max-width: 800px;
+                background: #1e1e1e;
+                border: 1px solid #3e3e3e;
+                border-radius: 6px;
+                padding: 0;
+                max-width: 1100px;
                 margin: 0 auto;
                 position: relative;
+                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
             }
             .terminal-header {
-                background: #333;
-                color: #00ff00;
+                background: #2d2d30;
+                color: #cccccc;
                 padding: 8px 12px;
-                border-radius: 8px 8px 0 0;
-                font-size: 14px;
-                border-bottom: 1px solid #00ff00;
+                border-radius: 6px 6px 0 0;
+                font-size: 13px;
+                border-bottom: 1px solid #3e3e3e;
                 display: flex;
                 align-items: center;
+                font-weight: 600;
             }
             .terminal-title {
                 flex: 1;
@@ -56,23 +58,25 @@ data:
                 height: 12px;
                 border-radius: 50%;
                 display: inline-block;
+                border: 1px solid #3e3e3e;
             }
             .red { background: #ff5f57; }
             .yellow { background: #ffbd2e; }
             .green { background: #28ca42; }
             .terminal-content {
                 padding: 25px;
-                font-size: 18px;
+                font-size: 16px;
+                background: #1e1e1e;
             }
             .command-line {
                 margin-bottom: 15px;
             }
             .prompt {
-                color: #00ff00;
+                color: #007acc;
                 font-weight: bold;
             }
             .output {
-                color: #00ff00;
+                color: #cccccc;
                 margin-left: 20px;
             }
             .cursor {
@@ -84,18 +88,32 @@ data:
             }
             .network-info {
                 margin-top: 20px;
-                border-top: 1px solid #00ff00;
+                border-top: 1px solid #3e3e3e;
                 padding-top: 15px;
             }
             .info-line {
                 margin-bottom: 8px;
             }
             .label {
-                color: #ffff00;
+                color: #569cd6;
                 font-weight: bold;
             }
             .value {
-                color: #00ffff;
+                color: #ce9178;
+            }
+            .status-indicator {
+                display: inline-block;
+                width: 8px;
+                height: 8px;
+                border-radius: 50%;
+                background: #28ca42;
+                margin-right: 8px;
+                animation: pulse 2s infinite;
+            }
+            @keyframes pulse {
+                0% { opacity: 1; }
+                50% { opacity: 0.5; }
+                100% { opacity: 1; }
             }
         </style>
     </head>
@@ -107,21 +125,22 @@ data:
                     <span class="terminal-button yellow"></span>
                     <span class="terminal-button green"></span>
                 </div>
-                <div class="terminal-title">Shape Network Terminal</div>
+                <div class="terminal-title">Shape Network</div>
             </div>
             <div class="terminal-content">
                 <div class="command-line">
-                    <span class="prompt">shape@network:~$</span> echo "GM Shapers of the world"<span class="cursor">_</span>
+                    <span class="prompt">shape@network:~$</span> echo " <span class="status-indicator"></span>GM Shapers of the world"
                 </div>
-                <div class="output">GM Shapers of the world</div>
-                
+                <div class="output">● GM Shapers of the world</div>
+
                 <div class="command-line">
                     <span class="prompt">shape@network:~$</span> shape-network status
                 </div>
-                <div class="output">✓ Shape Network is running</div>
-                <div class="output">✓ Chain ID: 360 (0x168)</div>
-                <div class="output">✓ Network: Shape Mainnet</div>
-                
+                <div class="output">● Shape Network is running</div>
+                <div class="output">● Chain ID: 360 (0x168)</div>
+                <div class="output">● Network: Shape Mainnet</div>
+                <div class="output">● Status: <span style="color: #28ca42;">Online</span></div>
+
                 <div class="network-info">
                     <div class="command-line">
                         <span class="prompt">shape@network:~$</span> cat /etc/shape/endpoints.conf
@@ -131,9 +150,10 @@ data:
                         <div class="info-line"><span class="label">WebSocket:</span> <span class="value">wss://{{ .Values.ingress.hostname }}/ws</span></div>
                         <div class="info-line"><span class="label">Legacy HTTP:</span> <span class="value">http://{{ .Values.ingress.hostname }}/rpc</span></div>
                         <div class="info-line"><span class="label">Legacy WS:</span> <span class="value">ws://{{ .Values.ingress.hostname }}/ws</span></div>
+                        <div class="info-line"><span class="label">Explorer:</span> <span class="value">https://{{ .Values.ingress.hostname }}</span></div>
                     </div>
                 </div>
-                
+
                 <div class="command-line">
                     <span class="prompt">shape@network:~$</span> <span class="cursor">_</span>
                 </div>

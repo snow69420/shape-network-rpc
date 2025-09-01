@@ -76,23 +76,16 @@ load_or_prompt_config() {
         export USER_EMAIL
         export DNS_LABEL
 
-        # Check if required values are present
-        if [[ -z "$DNS_LABEL" ]] || [[ -z "$USER_EMAIL" ]]; then
-            log_warn "DNS_LABEL or USER_EMAIL not found in .shape-config"
-            prompt_missing_config
-        else
-            log_success "Configuration loaded successfully"
-        fi
+        log_success "Configuration loaded successfully"
     else
-        log_info "No .shape-config found, prompting for configuration..."
-        prompt_missing_config
+        log_info "No .shape-config found, configuration will be prompted during installation"
     fi
 }
 
-# Prompt for missing configuration values
-prompt_missing_config() {
+# Prompt for DNS label configuration
+prompt_dns_config() {
     echo ""
-    log_header "🔧 Configuration Setup"
+    log_header "🔧 Azure DNS Configuration"
     echo ""
 
     # Prompt for DNS label if not set
@@ -121,6 +114,18 @@ prompt_missing_config() {
         done
     fi
 
+    # Export variables for Helm templating
+    export DNS_FQDN
+    export USER_EMAIL
+    export DNS_LABEL
+}
+
+# Prompt for email configuration
+prompt_email_config() {
+    echo ""
+    log_header "🔧 SSL Certificate Configuration"
+    echo ""
+
     # Prompt for email if not set
     if [ -z "$USER_EMAIL" ]; then
         echo -e "${CYAN}Let's Encrypt SSL Certificate Configuration${NC}"
@@ -140,9 +145,6 @@ prompt_missing_config() {
             fi
         done
     fi
-
-    # Save the configuration
-    save_user_configuration
 
     # Export variables for Helm templating
     export DNS_FQDN
@@ -631,6 +633,11 @@ deploy_shape_network_ssl() {
         --set certManager.enabled=true \
         --set homepage.enabled=true \
         --set service.type=ClusterIP \
+        --set ssl.domain="$DNS_FQDN" \
+        --set ssl.email="$USER_EMAIL" \
+        --set global.domain="$DNS_FQDN" \
+        --set certManager.clusterIssuer.email="$USER_EMAIL" \
+        --set ingress.hostname="$DNS_FQDN" \
         --wait \
         --timeout=15m > /dev/null
 
@@ -734,6 +741,9 @@ install_azure_infrastructure() {
     log_header "🏗️  Installing Azure Infrastructure"
     echo ""
 
+    # Prompt for DNS configuration if not already set
+    prompt_dns_config
+
     log_info "This will create:"
     log_info "• Resource Group: $RESOURCE_GROUP"
     log_info "• AKS Cluster: $AKS_CLUSTER"
@@ -776,6 +786,9 @@ install_shape_network_ssl() {
     fi
 
     log_success "✅ Using DNS: $DNS_FQDN"
+
+    # Prompt for email configuration if not already set
+    prompt_email_config
 
     # Check if infrastructure exists (optional for Shape Network only deployment)
     local infra_exists=true
@@ -836,6 +849,12 @@ install_shape_network_ssl() {
 install_complete_setup() {
     log_header "🚀 Complete Shape Network Setup"
     echo ""
+
+    # Prompt for DNS configuration if not already set
+    prompt_dns_config
+
+    # Prompt for email configuration if not already set
+    prompt_email_config
 
     log_info "This will perform a complete end-to-end deployment:"
     log_info "1. Azure Infrastructure"
